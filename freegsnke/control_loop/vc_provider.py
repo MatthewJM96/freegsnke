@@ -24,9 +24,8 @@ along with FreeGSNKE.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import abc
-import numpy as np
 
-from freegsnke import ObservableRegistry
+from freegsnke.observable_registry import ObservableRegistry
 from freegsnke.virtual_circuits import VirtualCircuit
 
 
@@ -40,7 +39,12 @@ class VirtualCircuitProvider(abc.ABC):
     """
 
     @abc.abstractmethod
-    def get_vc(self, time_stamp: float, targets: list[str], observable_registry: ObservableRegistry) -> VirtualCircuit | None:
+    def get_vc(
+        self,
+        time_stamp: float,
+        targets: list[str],
+        observable_registry: ObservableRegistry,
+    ) -> VirtualCircuit | None:
         """
         Gets a Virtual Circuit for the given timestamp and observables requested from
         the registry.
