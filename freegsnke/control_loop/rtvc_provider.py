@@ -208,6 +208,14 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         """
         Shuts down the RTVC server, subsequently cleaning up IPC resources used for
         communication with the server.
+
+        Parameters
+        ----------
+        unstarted_okay : bool (default: False)
+            If True, then should this function finding this
+            RealTimeVirtualCircuitProvider to be in an unstarted state does not result
+            in a warning being logged. If False, then a warning will be logged in this
+            scenario - the behaviour most desirable on explicit calls to this function.
         """
 
         if not self.started:
