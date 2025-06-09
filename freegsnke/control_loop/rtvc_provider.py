@@ -1,5 +1,6 @@
 import logging
 import re
+import struct
 from mmap import mmap
 from pathlib import Path
 from subprocess import PIPE, Popen, TimeoutExpired, run
@@ -15,6 +16,9 @@ from posix_ipc import (
     unlink_semaphore,
     unlink_shared_memory,
 )
+
+from freegsnke.observable_registry import ObservableRegistry
+from freegsnke.virtual_circuits import VirtualCircuit
 
 from .vc_provider import VirtualCircuitProvider
 
@@ -263,6 +267,70 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         self._started = False
 
         return True
+
+    def get_vc(
+        self, _: float, targets: list[str], observable_registry: ObservableRegistry
+    ) -> VirtualCircuit | None:
+        """
+        Gets a Virtual Circuit for the given timestamp and observables requested from
+        the registry.
+
+        Parameters
+        ----------
+        time_stamp : float (4 decimal places)
+            time stamp of the virtual circuit to be retrieved
+        observable_registry : ObservableRegistry
+            registry to obtain observables from
+
+        Returns
+        -------
+        vc : VirtualCircuit | None
+            virtual circuit object to be used by the control voltages class or None if
+            no virtual circuit could be obtained or constructed.
+        """
+        # TODO(Matthew): Get appropriate observables from the registry (do we store this
+        #                information in the model specs??).
+        # TODO(Matthew): Call _predict_vc to obtain the VC matrix (change this to obtain
+        #                the non-inverted matrix.)
+        # TODO(Matthew): Subset by targets and invert the matrix.
+        # TODO(Matthew): Return the result.
+
+    def _predict_vc(self, input_data: list[float]) -> list[float] | None:
+        """
+        Predict a virtual circuit by invoking inference on the RTVC server.
+
+        Parameters
+        ----------
+        input_data : list[float]
+            The input data on which the RTVC server should infer the virtual circuit
+            matrix.
+
+        TODO(Matthew): Do we want to change the type of input_data?
+        """
+        # Ensure data fits in the shared memory. Note the factor of 4 is reflects that
+        # we are working in 32-bit precision and so 4 bytes per input value.
+        if len(input_data) * 4 > self._SHARED_MEMORY_SIZE:
+            _logger.error("Input data too large for shared memory.")
+            return None
+
+        # Write input data to shared memory.
+        struct.pack_into(
+            f"{len(input_data)}f", self.self._shared_memory_map, 0, *input_data
+        )
+
+        # Signal that we are ready for an inference task to be performed.
+        self._sem_ready.release()
+
+        # Await result of inference. If we timeout, then log an error and fail up.
+        try:
+            self._sem_done.acquire(timeout=10)
+        except BusyError:
+            _logger.error("RTVC server timedout inferring a virtual circuit.")
+            return None
+
+        # Read result and return it.
+        # TODO(Matthew): Dynamically calculate the size of the returned matrix?
+        return [*struct.unpack_from("195f", self.self._shared_memory_map, 0)]
 
     def _validate_rtvc_binary(self) -> bool:
         """
