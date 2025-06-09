@@ -1,6 +1,8 @@
 import logging
 import mmap
 from pathlib import Path
+import re
+from subprocess import Popen, run, PIPE, TimeoutExpired
 
 from posix_ipc import Semaphore, SharedMemory, O_CREAT, O_EXCL, unlink_semaphore, unlink_shared_memory, BusyError, ExistentialError, SEMAPHORE_TIMEOUT_SUPPORTED
 
@@ -14,6 +16,8 @@ _SHARED_MEMORY_SIZE = 1024
 _SEM_READY_NAME = "/rtvc_inf_req"
 _SEM_DONE_NAME = "/rtvc_inf_done"
 _SEM_QUIT_NAME = "/rtvc_quit"
+
+_RTVC_VERSION_PATTERN = r"^rtvc v(\d+\.\d+\.\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
 
 
 if not SEMAPHORE_TIMEOUT_SUPPORTED:
@@ -106,6 +110,36 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         except BusyError:
             _logger.error(
                 "Could not communicate with RTVC server, likely it failed to start up."
+            )
+            return False
+
+        return True
+
+    def _validate_rtvc_binary(self) -> bool:
+        """
+        Validates the RTVC binary of this instance. Checks first that the binary exists,
+        # and secondly that it can return version info as expected.
+        """
+
+        if not self._rtvc_binary.is_file():
+            _logger.error(f"Provided RTVC binary does not exist: {self._rtvc_binary}")
+            return False
+
+        # Obtain RTVC version, with a timeout of 10 seconds.
+        try:
+            result = run([str(self._rtvc_binary), "--version"], stdout=PIPE, timeout=10)
+        except TimeoutExpired:
+            _logger.error(
+                f"RTVC binary hung when requesting version info: {self._rtvc_binary}"
+            )
+            return False
+
+        version_string = result.stdout.decode("utf-8")
+
+        if not re.match(_RTVC_VERSION_PATTERN, version_string):
+            _logger.error(
+                f"RTVC binary does not look right, a call to:\n    {self._rtvc_binary} "
+                f"--version\nresulted in:\n    {version_string}"
             )
             return False
 
