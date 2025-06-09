@@ -309,14 +309,12 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         """
         # Ensure data fits in the shared memory. Note the factor of 4 is reflects that
         # we are working in 32-bit precision and so 4 bytes per input value.
-        if len(input_data) * 4 > self._SHARED_MEMORY_SIZE:
+        if len(input_data) * 4 > _SHARED_MEMORY_SIZE:
             _logger.error("Input data too large for shared memory.")
             return None
 
         # Write input data to shared memory.
-        struct.pack_into(
-            f"{len(input_data)}f", self.self._shared_memory_map, 0, *input_data
-        )
+        struct.pack_into(f"{len(input_data)}f", self._shared_memory_map, 0, *input_data)
 
         # Signal that we are ready for an inference task to be performed.
         self._sem_ready.release()
@@ -330,7 +328,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         # Read result and return it.
         # TODO(Matthew): Dynamically calculate the size of the returned matrix?
-        return [*struct.unpack_from("195f", self.self._shared_memory_map, 0)]
+        return [*struct.unpack_from("195f", self._shared_memory_map, 0)]
 
     def _validate_rtvc_binary(self) -> bool:
         """
