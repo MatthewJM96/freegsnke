@@ -11,13 +11,19 @@ from .vc_provider import VirtualCircuitProvider
 _logger = logging.getLogger(__name__)
 
 
+# Handle names for shared memory and semaphore, plus size of shared memory segment.
 _SHARED_MEMORY_NAME = "/rtvc_shm"
-_SHARED_MEMORY_SIZE = 1024
+_SHARED_MEMORY_SIZE = 1024 # 1kB
 _SEM_READY_NAME = "/rtvc_inf_req"
 _SEM_DONE_NAME = "/rtvc_inf_done"
 _SEM_QUIT_NAME = "/rtvc_quit"
 
-_RTVC_VERSION_PATTERN = r"^rtvc v(\d+\.\d+\.\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
+# Regex pattern that allows only "rtvc v<VER>" where <VER> is a valid Semantic
+# Versioning string.
+_RTVC_VERSION_PATTERN = (
+    r"^rtvc v(\d+\.\d+\.\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))"
+    r"?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$"
+)
 
 
 if not SEMAPHORE_TIMEOUT_SUPPORTED:
@@ -225,8 +231,11 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             )
             return False
 
+        # Decode version string provided in stdout by RTVC binary.
         version_string = result.stdout.decode("utf-8")
 
+        # Validate that the version string obtained matches "rtvc v<VER>" where <VER> is
+        # a valid Semantic Versioning string.
         if not re.match(_RTVC_VERSION_PATTERN, version_string):
             _logger.error(
                 f"RTVC binary does not look right, a call to:\n    {self._rtvc_binary} "
