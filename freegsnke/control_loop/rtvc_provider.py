@@ -1,10 +1,20 @@
 import logging
+import re
 from mmap import mmap
 from pathlib import Path
-import re
-from subprocess import Popen, run, PIPE, TimeoutExpired
+from subprocess import PIPE, Popen, TimeoutExpired, run
 
-from posix_ipc import Semaphore, SharedMemory, O_CREAT, O_EXCL, unlink_semaphore, unlink_shared_memory, BusyError, ExistentialError, SEMAPHORE_TIMEOUT_SUPPORTED
+from posix_ipc import (
+    O_CREAT,
+    O_EXCL,
+    SEMAPHORE_TIMEOUT_SUPPORTED,
+    BusyError,
+    ExistentialError,
+    Semaphore,
+    SharedMemory,
+    unlink_semaphore,
+    unlink_shared_memory,
+)
 
 from .vc_provider import VirtualCircuitProvider
 
@@ -13,7 +23,7 @@ _logger = logging.getLogger(__name__)
 
 # Handle names for shared memory and semaphore, plus size of shared memory segment.
 _SHARED_MEMORY_NAME = "/rtvc_shm"
-_SHARED_MEMORY_SIZE = 1024 # 1kB
+_SHARED_MEMORY_SIZE = 1024  # 1kB
 _SEM_READY_NAME = "/rtvc_inf_req"
 _SEM_DONE_NAME = "/rtvc_inf_done"
 _SEM_QUIT_NAME = "/rtvc_quit"
@@ -39,7 +49,12 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
     circuits from this.
     """
 
-    def __init__(self, model_specs: list[Path], rtvc_binary: Path | None = None, start_rtvc_now: bool = True):
+    def __init__(
+        self,
+        model_specs: list[Path],
+        rtvc_binary: Path | None = None,
+        start_rtvc_now: bool = True,
+    ):
         self._started = False
         self._shared_memory: SharedMemory | None = None
         self._shared_memory_map: mmap | None = None
@@ -97,7 +112,11 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         # to achieve this.
 
         try:
-            self._shared_memory = SharedMemory(name=_SHARED_MEMORY_NAME, flags=O_CREAT | O_EXCL, size=_SHARED_MEMORY_SIZE)
+            self._shared_memory = SharedMemory(
+                name=_SHARED_MEMORY_NAME,
+                flags=O_CREAT | O_EXCL,
+                size=_SHARED_MEMORY_SIZE,
+            )
         except ExistentialError:
             _logger.error("Shared memory segment already exists for RTVC comms.")
             return False
@@ -125,9 +144,15 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         #           Semaphore to avoid a race condition.
 
         try:
-            self._sem_ready = Semaphore(name=_SEM_READY_NAME, flags=O_CREAT | O_EXCL, initial_value=0)
-            self._sem_done = Semaphore(name=_SEM_DONE_NAME, flags=O_CREAT | O_EXCL, initial_value=0)
-            self._sem_quit = Semaphore(name=_SEM_QUIT_NAME, flags=O_CREAT | O_EXCL, initial_value=0)
+            self._sem_ready = Semaphore(
+                name=_SEM_READY_NAME, flags=O_CREAT | O_EXCL, initial_value=0
+            )
+            self._sem_done = Semaphore(
+                name=_SEM_DONE_NAME, flags=O_CREAT | O_EXCL, initial_value=0
+            )
+            self._sem_quit = Semaphore(
+                name=_SEM_QUIT_NAME, flags=O_CREAT | O_EXCL, initial_value=0
+            )
         except ExistentialError:
             _logger.error("Semaphores already exist for RTVC comms.")
             return False
@@ -140,7 +165,9 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         #                  uninverted matrix, and then do inversion here after cropping
         #                  to the scheduled target space.
         rtvc_cmd = [str(self._rtvc_binary), "--jacobian"]
-        rtvc_cmd.extend([f"--model-spec={model_spec}" for model_spec in self._model_specs])
+        rtvc_cmd.extend(
+            [f"--model-spec={model_spec}" for model_spec in self._model_specs]
+        )
         # Invoke the RTVC process, we will now only communicate with the RTVC server
         # using the IPC resources until such a time as we come to shutdown where we will
         # use this process handle accordingly.
