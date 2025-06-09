@@ -52,6 +52,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         if not all([model_spec.is_file() for model_spec in model_specs]):
             self._model_specs = model_specs
 
+        # Start RTVC server if requested to start now.
         if start_rtvc_now:
             if self.start_up():
                 self._started = True
