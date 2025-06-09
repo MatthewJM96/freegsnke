@@ -64,6 +64,14 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             else:
                 _logger.error("Failed to start RTVC server.")
 
+    def __del__(self):
+        """
+        On destruction of this object, make sure we clean up IPC resources if needed.
+        """
+        # unstarted_okay=True avoids a log warning if we were in an unstarted state (aka
+        # no resources to clean up).
+        self.shutdown(unstarted_okay=True)
+
     @property
     def started(self) -> bool:
         return self._started
@@ -146,14 +154,17 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         return True
 
-    def shutdown(self) -> bool:
+    def shutdown(self, unstarted_okay: bool = False) -> bool:
         """
         Shuts down the RTVC server, subsequently cleaning up IPC resources used for
         communication with the server.
         """
 
         if not self.started:
-            _logger.warning("Tried to shutdown RTVC server when it wasn't started yet.")
+            if not unstarted_okay:
+                _logger.warning(
+                    "Tried to shutdown RTVC server when it wasn't started yet."
+                )
             return False
 
         # Send quit signal to the RTVC server, note the ready signal is part of this
