@@ -53,6 +53,10 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             else:
                 _logger.error("Failed to start RTVC server.")
 
+    @property
+    def started(self) -> bool:
+        return self._started
+
     def start_up(self) -> bool:
         """
         Creates the IPC resources needed to communicate with the RTVC server, and then
