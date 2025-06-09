@@ -113,7 +113,19 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             _logger.error("Semaphores already exist for RTVC comms.")
             return False
 
-        # TODO(Matthew): Start RTVC server.
+        # Construct the command to invoke the RTVC server with.
+        #   NOTE(Matthew): For now we pass a --jacobian flag to obtain the full
+        #                  sensitivity matrix. As this involves an inversion we cannot
+        #                  then filter out columns corresponding to targets we don't
+        #                  want to change. As such it may be desirable to obtain the
+        #                  uninverted matrix, and then do inversion here after cropping
+        #                  to the scheduled target space.
+        rtvc_cmd = [str(self._rtvc_binary), "--jacobian"]
+        rtvc_cmd.extend([f"--model-spec={model_spec}" for model_spec in self._model_specs])
+        # Invoke the RTVC process, we will now only communicate with the RTVC server
+        # using the IPC resources until such a time as we come to shutdown where we will
+        # use this process handle accordingly.
+        self._rtvc_process = Popen(rtvc_cmd)
 
         # Await an alive signal from the RTVC server, if not received in the timeout
         # period we log an error as we consider the RTVC server dead.
