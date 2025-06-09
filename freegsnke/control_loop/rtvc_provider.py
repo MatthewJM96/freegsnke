@@ -55,6 +55,23 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         rtvc_binary: Path | None = None,
         start_rtvc_now: bool = True,
     ):
+        """
+        Initialises the RealTimeVirtualCircuitProvider instance, by default starting up
+        the RTVC server it will communicate with to obtain virtual circuit predictions.
+
+        Parameters
+        ----------
+        model_specs : list[pathlib.Path]
+            List of model spec filepaths to use for initialising the RTVC server.
+        rtvc_binary : pathlib.Path | None (default: None)
+            Path to an RTVC binary, if None then path is taken to be "./rtvc".
+        start_rtvc_now : bool (default: True)
+            If True, the RTVC server and associated IPC resources are instantiated as
+            part of RealTimeVirtualCircuitProvider initialisation. If False, then
+            `RealTimeVirtualCircuitProvider.start_up` must be called later to do this
+            instead; this is required in order to get virtual circuits from this
+            provider.
+        """
         self._started = False
         self._shared_memory: SharedMemory | None = None
         self._shared_memory_map: mmap | None = None
