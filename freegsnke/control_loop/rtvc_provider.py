@@ -69,6 +69,10 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         starts that server up.
         """
 
+        if self.started:
+            _logger.warning("Tried to start RTVC server when it's already started.")
+            return False
+
         # Create a shared memory segment with name _SHARED_MEMORY_NAME and size
         # _SHARED_MEMORY_SIZE. Under the hood, posix_ipc uses `shm_open` and `ftruncate`
         # to achieve this.
