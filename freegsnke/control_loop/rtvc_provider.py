@@ -33,8 +33,9 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
     circuits from this.
     """
 
-    def __init__(self, rtvc_binary: Path | None = None, start_rtvc_now: bool = True):
+    def __init__(self, model_specs: list[Path], rtvc_binary: Path | None = None, start_rtvc_now: bool = True):
         self._started = False
+        self._rtvc_process: Popen | None = None
 
         # Set default RTVC binary path.
         if rtvc_binary is None:
@@ -46,6 +47,10 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         # done from within this method, we simply do an early exit here.
         if not self._validate_rtvc_binary():
             return
+
+        # Validate all model specs provided are at least existing files.
+        if not all([model_spec.is_file() for model_spec in model_specs]):
+            self._model_specs = model_specs
 
         if start_rtvc_now:
             if self.start_up():
