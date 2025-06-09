@@ -4,3 +4,4 @@ matplotlib~=3.10.3
 h5py~=3.13.0
 deepdiff~=7.0.1
 notebook~=7.4.2
+posix-ipc~=1.2.0
