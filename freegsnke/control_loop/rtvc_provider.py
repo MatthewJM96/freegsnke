@@ -1,5 +1,5 @@
 import logging
-import mmap
+from mmap import mmap
 from pathlib import Path
 import re
 from subprocess import Popen, run, PIPE, TimeoutExpired
@@ -35,6 +35,11 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
     def __init__(self, model_specs: list[Path], rtvc_binary: Path | None = None, start_rtvc_now: bool = True):
         self._started = False
+        self._shared_memory: SharedMemory | None = None
+        self._shared_memory_map: mmap | None = None
+        self._sem_ready: Semaphore | None = None
+        self._sem_done: Semaphore | None = None
+        self._sem_quit: Semaphore | None = None
         self._rtvc_process: Popen | None = None
 
         # Set default RTVC binary path.
@@ -87,7 +92,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         # process. This gives us a pointer at which location we can set data to pass to
         # the RTVC server for VC prediction.
 
-        self._shared_memory_ptr = mmap.mmap(self._shared_memory.fd, _SHARED_MEMORY_SIZE)
+        self._shared_memory_map = mmap(self._shared_memory.fd, _SHARED_MEMORY_SIZE)
 
         # Create a set of semaphores used for communicating between this process and the
         # RTVC server. These semaphores have the following responsibilities:
@@ -138,6 +143,55 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
                 "Could not communicate with RTVC server, likely it failed to start up."
             )
             return False
+
+        return True
+
+    def shutdown(self) -> bool:
+        """
+        Shuts down the RTVC server, subsequently cleaning up IPC resources used for
+        communication with the server.
+        """
+
+        if not self.started:
+            _logger.warning("Tried to shutdown RTVC server when it wasn't started yet.")
+            return False
+
+        # Send quit signal to the RTVC server, note the ready signal is part of this
+        # to avoid a race condition.
+        self._sem_quit.release()
+        self._sem_ready.release()
+
+        # Give RTVC server 10 seconds to shutdown gracefully.
+        try:
+            self._rtvc_process.wait(timeout=10)
+        except TimeoutExpired:
+            # SIGKILL the RTVC server - this is ugly but all handles on IPC resources
+            # are guaranteed to be freed and the RTVC server is stateless, so ultimately
+            # not so bad.
+            self._rtvc_process.kill()
+
+        # Close our handles on IPC resources.
+        self._shared_memory_map.close()
+        self._shared_memory.close_fd()
+        self._sem_ready.close()
+        self._sem_done.close()
+        self._sem_quit.close()
+
+        # Unlink (aka destroy) IPC resources as existing in the OS.
+        unlink_shared_memory(self._SHARED_MEMORY_NAME)
+        unlink_semaphore(_SEM_READY_NAME)
+        unlink_semaphore(_SEM_DONE_NAME)
+        unlink_semaphore(_SEM_QUIT_NAME)
+
+        # For completeness, unset our IPC fields.
+        self._shared_memory = None
+        self._shared_memory_map = None
+        self._sem_ready = None
+        self._sem_done = None
+        self._sem_quit = None
+
+        # We are no longer in a started state.
+        self._started = False
 
         return True
 
