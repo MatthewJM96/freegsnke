@@ -401,7 +401,10 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         return True
 
     def get_vc(
-        self, _: float, targets: list[str], observable_registry: ObservableRegistry
+        self,
+        timestamp: float,
+        targets: list[str],
+        observable_registry: ObservableRegistry,
     ) -> VirtualCircuit | None:
         """
         Gets a Virtual Circuit for the given timestamp and observables requested from
@@ -409,7 +412,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         Parameters
         ----------
-        time_stamp : float (4 decimal places)
+        timestamp : float (4 decimal places)
             time stamp of the virtual circuit to be retrieved
         observable_registry : ObservableRegistry
             registry to obtain observables from
@@ -421,12 +424,32 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             no virtual circuit could be obtained or constructed.
         """
 
-        # TODO(Matthew): Get appropriate observables from the registry (do we store this
-        #                information in the model specs??).
-        # TODO(Matthew): Call _predict_vc to obtain the VC matrix (change this to obtain
-        #                the non-inverted matrix.)
-        # TODO(Matthew): Subset by targets and invert the matrix.
-        # TODO(Matthew): Return the result.
+        # NOTE(Matthew): We are assuming all models require the same inputs, this
+        #                restriction concerns the note concerning validation of the
+        #                assumption in RealTimeVirtualCircuitsProvider.__init__.
+        input_data: list[float] = []
+        for input in self._model_specs[0].inputs:
+            input_val = observable_registry.get(input)
+            if input_val is None:
+                _logger.error(
+                    f"Could not retried {input} to get VC at time {timestamp}"
+                )
+                return None
+            input_data.append(input_val)
+
+        # TODO(Matthew): Change this to be target matrix as we need to then subset by
+        #                schedule and do inversion after this.
+        vc_matrix = self._predict_vc(input_data)
+        if vc_matrix is None:
+            _logger.error(
+                f"Failed to obtain VC matrix at time {timestamp} from the RTVC server."
+            )
+            return None
+
+        # TODO(Matthew): Implement subsetting and inversion here? Probably not as we
+        #                don't want to inject schedule into the provider... or do we?
+
+        return VirtualCircuit(VCs_matrix=vc_matrix)
 
     def _predict_vc(self, input_data: list[float]) -> list[float] | None:
         """
