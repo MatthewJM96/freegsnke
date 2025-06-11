@@ -154,7 +154,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
     def __init__(
         self,
-        model_specs: list[Path],
+        model_spec_paths: list[Path],
         rtvc_binary: Path | None = None,
         start_rtvc_now: bool = True,
     ):
@@ -164,7 +164,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         Parameters
         ----------
-        model_specs : list[pathlib.Path]
+        model_spec_paths : list[pathlib.Path]
             List of model spec filepaths to use for initialising the RTVC server.
         rtvc_binary : pathlib.Path | None (default: None)
             Path to an RTVC binary, if None then path is taken to be "./rtvc".
@@ -194,9 +194,17 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         if not self._validate_rtvc_binary():
             return
 
-        # Validate all model specs provided are at least existing files.
-        if not all([model_spec.is_file() for model_spec in model_specs]):
-            self._model_specs = model_specs
+        # Load and validate all model specs.
+
+        self._model_specs: list[ModelSpec] = []
+        for path in model_spec_paths:
+            model_spec = ModelSpec.from_filepath(path)
+
+            if model_spec is None:
+                _logger.error(f"Provided invalid model spec at {path}.")
+                return
+
+            self._model_specs.append(model_spec)
 
         # Start RTVC server if requested to start now.
         if start_rtvc_now:
@@ -286,7 +294,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         #                  to the scheduled target space.
         rtvc_cmd = [str(self._rtvc_binary), "--jacobian"]
         rtvc_cmd.extend(
-            [f"--model-spec={model_spec}" for model_spec in self._model_specs]
+            [f"--model-spec={model_spec.data_file}" for model_spec in self._model_specs]
         )
         # Invoke the RTVC process, we will now only communicate with the RTVC server
         # using the IPC resources until such a time as we come to shutdown where we will
