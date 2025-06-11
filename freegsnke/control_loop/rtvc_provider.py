@@ -196,6 +196,13 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         # Load and validate all model specs.
 
+        if len(model_spec_paths) < 1:
+            _logger.error(
+                "At least one model spec must be supplied to "
+                "RealTimeVirtualCircuitProvider."
+            )
+            return
+
         self._model_specs: list[ModelSpec] = []
         for path in model_spec_paths:
             model_spec = ModelSpec.from_filepath(path)
