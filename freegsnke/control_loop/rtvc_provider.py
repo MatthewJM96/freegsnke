@@ -206,6 +206,24 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
             self._model_specs.append(model_spec)
 
+        # Validate that all model specs have the same inputs and outputs.
+        # NOTE(Matthew): If we wish to support any notion of heterogenous consensus, we
+        #                would need to relax this check.
+
+        for idx in range(1, len(self._model_specs)):
+            if self._model_specs[idx].inputs != self._model_specs[0].inputs:
+                _logger.error(
+                    f"The {idx+1}th model spec provided does not conform in inputs to "
+                    "that of the first model spec."
+                )
+                return
+            if self._model_specs[idx].outputs != self._model_specs[0].outputs:
+                _logger.error(
+                    f"The {idx+1}th model spec provided does not conform in outputs to "
+                    "that of the first model spec."
+                )
+                return
+
         # Start RTVC server if requested to start now.
         if start_rtvc_now:
             if self.start_up():
@@ -395,6 +413,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             virtual circuit object to be used by the control voltages class or None if
             no virtual circuit could be obtained or constructed.
         """
+
         # TODO(Matthew): Get appropriate observables from the registry (do we store this
         #                information in the model specs??).
         # TODO(Matthew): Call _predict_vc to obtain the VC matrix (change this to obtain
