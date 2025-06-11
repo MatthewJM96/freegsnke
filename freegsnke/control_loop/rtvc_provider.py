@@ -4,6 +4,7 @@ import struct
 from mmap import mmap
 from pathlib import Path
 from subprocess import PIPE, Popen, TimeoutExpired, run
+from typing import NamedTuple
 
 from posix_ipc import (
     O_CREAT,
@@ -16,6 +17,7 @@ from posix_ipc import (
     unlink_semaphore,
     unlink_shared_memory,
 )
+from yaml import YAMLError, safe_load
 
 from freegsnke.observable_registry import ObservableRegistry
 from freegsnke.virtual_circuits import VirtualCircuit
@@ -45,6 +47,103 @@ if not SEMAPHORE_TIMEOUT_SUPPORTED:
         "Semaphore timeout is not supported on this system, as such a failure of the "
         "RTVC server to start up will result in this program stalling."
     )
+
+
+class ModelSpec(NamedTuple):
+    """
+    A model spec holds metadata regarding a model that is pertinent to preparing for and
+    processing after inference.
+    """
+
+    data_file: Path
+    inputs: list[str]
+    outputs: list[str]
+
+    @staticmethod
+    def from_filepath(filepath: Path) -> "ModelSpec" | None:
+        """
+        Loads a model spec from the listed filepath. If the model spec could not be
+        loaded, then None is returned.
+
+        Parameters
+        ----------
+        filepath : pathlib.Path
+            The filepath to the model spec to load.
+        """
+        # Ensure a file exists at the provided filepath, only way it could possibly be
+        # a model spec!
+
+        if not filepath.is_file():
+            _logger.warning(f"No model spec exists at: {filepath}")
+            return None
+
+        # Load YAML into `data`, notet hat we use safe_load as it guarantees no funny
+        # business, and we have an invalid model spec should PyYAML throw an exception
+        # for any reason.
+
+        with open(filepath, "r") as f:
+            try:
+                data = safe_load(filepath)
+            except YAMLError as e:
+                _logger.warning(f"Invalid model spec at: {filepath}\n{e}")
+                return None
+
+        # We expect a dictionary with three keys, "data_file", "inputs", and "outputs".
+
+        if not isinstance(data, dict):
+            _logger.warning(f"Invalid model spec at: {filepath}\n{e}")
+            return None
+
+        if len(set("data_file", "inputs", "outputs") - set(data)) != 0:
+            _logger.warning(f"Invalid model spec at: {filepath}\n{e}")
+            return None
+
+        # Validate the filepath provided by "data_file" is a valid file.
+
+        if not isinstance(data["data_file"], str):
+            _logger.warning(
+                f"Invalid data filepath provided in model spec at: {filepath}"
+            )
+            return None
+
+        data_filepath = Path(data["data_file"])
+        if not data_filepath.is_file():
+            _logger.warning(
+                "Data filepath provided by model spec is not a file, filepath was: "
+                f"{data_filepath}"
+            )
+            return None
+
+        # TODO(Matthew): validate with tflite lib? RTVC will fail to start up if it
+        #                isn't a valid model so in any case this will be caught but it
+        #                would let us provide a nicer warning to do it here.
+
+        # Validate that inputs and outputs are lists of strings.
+
+        inputs = data["inputs"]
+        outputs = data["outputs"]
+        if not isinstance(inputs, list) or not isinstance(outputs, list):
+            _logger.warning(
+                "One of inputs or outputs was not a list as provided by model spec at: "
+                f"{filepath}"
+            )
+            return None
+
+        if not all([isinstance(x, str) for x in inputs]):
+            _logger.warning(
+                "At least one input was not a string as provided by model spec at: "
+                f"{filepath}"
+            )
+            return None
+
+        if not all([isinstance(x, str) for x in outputs]):
+            _logger.warning(
+                "At least one input was not a string as provided by model spec at: "
+                f"{filepath}"
+            )
+            return None
+
+        return ModelSpec(data_filepath, inputs, outputs)
 
 
 class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
