@@ -544,3 +544,33 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             return False
 
         return True
+
+    def _validate_observable_registry(
+        self, observable_registry: ObservableRegistry
+    ) -> bool:
+        """
+        Determine if the provided observable registry satisfies the necessary
+        requirements for get_vc to be executed correctly. E.g. does it provide access to
+        all the physical parameters of an equilibrium needed by a model.
+
+        Parameters
+        ----------
+        observable_registry : ObservableRegistry
+            The observable registry to validate.
+        """
+
+        # NOTE(Matthew): We are assuming all models require the same inputs, this
+        #                restriction concerns the note concerning validation of the
+        #                assumption in RealTimeVirtualCircuitsProvider.__init__.
+        missing_inputs = [
+            not observable_registry.has(input) for input in self._model_specs[0].inputs
+        ]
+
+        if len(missing_inputs) != 0:
+            _logger.warning(
+                "RealTimeVirtualCircuitProvider supplied an observable registry that is"
+                f" missing support for the following observables: {missing_inputs}"
+            )
+            return False
+
+        return True
