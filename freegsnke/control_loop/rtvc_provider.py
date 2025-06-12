@@ -437,10 +437,10 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         #                assumption in RealTimeVirtualCircuitsProvider.__init__.
         input_data: list[float] = []
         for input in self._model_specs[0].inputs:
-            input_val = self._observable_registry.get(input)
+            input_val = self._observable_registry.get(input, timestamp)
             if input_val is None:
                 _logger.error(
-                    f"Could not retried {input} to get VC at time {timestamp}"
+                    f"Could not retrieve {input} to calculate VC at time {timestamp}"
                 )
                 return None
             input_data.append(input_val)
