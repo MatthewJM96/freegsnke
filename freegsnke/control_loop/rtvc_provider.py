@@ -464,6 +464,8 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
                 return None
             input_data.append(input_val)
 
+        # Predict the shape matrix by sending a request to the RTVC server.
+
         shape_matrix = self._predict_shape_matrix(input_data)
         if shape_matrix is None:
             _logger.error(
@@ -472,10 +474,17 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             )
             return None
 
-        # TODO(Matthew): Implement subsetting and inversion here? Probably not as we
-        #                don't want to inject schedule into the provider... or do we?
+        # Subset the shape matrix by targets specified, and then invert to get VC
+        # matrix.
 
-        return VirtualCircuit(shape_matrix=shape_matrix)
+        target_indices = [
+            self._model_specs[0].inputs.index(target) for target in targets
+        ]
+        subsetted_shape_matrix = shape_matrix[target_indices, :]
+
+        vc_matrix = np.linalg.pinv(subsetted_shape_matrix)
+
+        return VirtualCircuit(shape_matrix=shape_matrix, VCs_matrix=vc_matrix)
 
     def _predict_shape_matrix(self, input_data: np.ndarray) -> np.ndarray | None:
         """
