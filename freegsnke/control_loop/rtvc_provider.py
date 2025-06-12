@@ -406,12 +406,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         return True
 
-    def get_vc(
-        self,
-        timestamp: float,
-        targets: list[str],
-        observable_registry: ObservableRegistry,
-    ) -> VirtualCircuit | None:
+    def get_vc(self, timestamp: float, targets: list[str]) -> VirtualCircuit | None:
         """
         Gets a Virtual Circuit for the given timestamp and observables requested from
         the registry.
@@ -420,8 +415,8 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         ----------
         timestamp : float (4 decimal places)
             time stamp of the virtual circuit to be retrieved
-        observable_registry : ObservableRegistry
-            registry to obtain observables from
+        targets : list[str]
+            list of targets to get a virtual circuit for
 
         Returns
         -------
@@ -430,12 +425,19 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             no virtual circuit could be obtained or constructed.
         """
 
+        if self._observable_registry is None:
+            _logger.error(
+                "RealTimeVirtualCircuitProvider cannot generate a virtual circuit "
+                "unless a valid observable registry is supplied."
+            )
+            return None
+
         # NOTE(Matthew): We are assuming all models require the same inputs, this
         #                restriction concerns the note concerning validation of the
         #                assumption in RealTimeVirtualCircuitsProvider.__init__.
         input_data: list[float] = []
         for input in self._model_specs[0].inputs:
-            input_val = observable_registry.get(input)
+            input_val = self._observable_registry.get(input)
             if input_val is None:
                 _logger.error(
                     f"Could not retried {input} to get VC at time {timestamp}"
