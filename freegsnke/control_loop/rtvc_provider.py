@@ -158,6 +158,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         model_spec_paths: list[Path],
         rtvc_binary: Path | None = None,
         start_rtvc_now: bool = True,
+        observable_registry: ObservableRegistry | None = None,
     ):
         """
         Initialises the RealTimeVirtualCircuitProvider instance, by default starting up
@@ -175,6 +176,8 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             `RealTimeVirtualCircuitProvider.start_up` must be called later to do this
             instead; this is required in order to get virtual circuits from this
             provider.
+        observable_registry : ObservableRegistry | None (default: None)
+            The observable registry to set the provider to use.
         """
         self._started = False
         self._shared_memory: SharedMemory | None = None
@@ -238,6 +241,8 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
                 self._started = True
             else:
                 _logger.error("Failed to start RTVC server.")
+
+        super().__init__(observable_registry=observable_registry)
 
     def __del__(self):
         """
