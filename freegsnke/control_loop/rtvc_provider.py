@@ -425,6 +425,13 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             no virtual circuit could be obtained or constructed.
         """
 
+        # NOTE(Matthew): We are assuming all models require the same inputs, this
+        #                restriction concerns the note concerning validation of the
+        #                assumption in RealTimeVirtualCircuitsProvider.__init__.
+
+        # Make sure we have an observable registry, which in turn implies it is
+        # validated to support all inputs out models require.
+
         if self._observable_registry is None:
             _logger.error(
                 "RealTimeVirtualCircuitProvider cannot generate a virtual circuit "
@@ -432,9 +439,21 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             )
             return None
 
-        # NOTE(Matthew): We are assuming all models require the same inputs, this
-        #                restriction concerns the note concerning validation of the
-        #                assumption in RealTimeVirtualCircuitsProvider.__init__.
+        # Check that the targets requested are supported by models this instance of RTVC
+        # has loaded.
+
+        unsupported_targets = [
+            target not in self._model_specs[0].inputs for target in targets
+        ]
+        if len(unsupported_targets) != 0:
+            _logger.error(
+                "Unsupported targets supplied to RealTimeVirtualCircuitProvider.get_vc:"
+                f" {unsupported_targets}"
+            )
+            return None
+
+        # Get all input values from the observable registry.
+
         input_data: list[float] = []
         for input in self._model_specs[0].inputs:
             input_val = self._observable_registry.get(input, timestamp)
