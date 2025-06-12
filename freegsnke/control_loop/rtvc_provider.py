@@ -61,7 +61,7 @@ class ModelSpec(NamedTuple):
     outputs: list[str]
 
     @staticmethod
-    def from_filepath(filepath: Path) -> "ModelSpec" | None:
+    def from_filepath(filepath: Path) -> "ModelSpec | None":
         """
         Loads a model spec from the listed filepath. If the model spec could not be
         loaded, then None is returned.
