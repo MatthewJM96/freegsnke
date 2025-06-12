@@ -6,6 +6,7 @@ from pathlib import Path
 from subprocess import PIPE, Popen, TimeoutExpired, run
 from typing import NamedTuple
 
+import numpy as np
 from posix_ipc import (
     O_CREAT,
     O_EXCL,
@@ -439,33 +440,49 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
 
         # TODO(Matthew): Change this to be target matrix as we need to then subset by
         #                schedule and do inversion after this.
-        vc_matrix = self._predict_vc(input_data)
-        if vc_matrix is None:
+        shape_matrix = self._predict_shape_matrix(input_data)
+        if shape_matrix is None:
             _logger.error(
-                f"Failed to obtain VC matrix at time {timestamp} from the RTVC server."
+                f"Failed to obtain shape matrix at time {timestamp} from the RTVC "
+                "server."
             )
             return None
 
         # TODO(Matthew): Implement subsetting and inversion here? Probably not as we
         #                don't want to inject schedule into the provider... or do we?
 
-        return VirtualCircuit(VCs_matrix=vc_matrix)
+        return VirtualCircuit(shape_matrix=shape_matrix)
 
-    def _predict_vc(self, input_data: list[float]) -> list[float] | None:
+    def _predict_shape_matrix(self, input_data: np.ndarray) -> np.ndarray | None:
         """
-        Predict a virtual circuit by invoking inference on the RTVC server.
+        Predict a shape circuit by invoking inference on the RTVC server. A shape matrix
+        is the Jacobian of output targets with respect to input data. Input data mainly
+        consists of currents, but can also include physical parameters like li and
+        betap. Output targets are geometric properties of the plasma.
 
         Parameters
         ----------
         input_data : list[float]
             The input data on which the RTVC server should infer the virtual circuit
             matrix.
-
-        TODO(Matthew): Do we want to change the type of input_data?
         """
         # Ensure data fits in the shared memory. Note the factor of 4 is reflects that
         # we are working in 32-bit precision and so 4 bytes per input value.
-        if len(input_data) * 4 > _SHARED_MEMORY_SIZE:
+        if input_data.dtype != np.float32:
+            try:
+                input_data = input_data.astype(np.float32)
+            except Exception:
+                _logger.error("Invalid type of input data supplied, expect float32.")
+                return None
+
+        if len(input_data.shape) != 1:
+            _logger.error(
+                "Invalid input data shape provided to RealTimeVirtualCircuitProvider."
+                f"_predict_shape_matrix: {input_data.shape}"
+            )
+            return None
+
+        if input_data.shape[0] * 4 > _SHARED_MEMORY_SIZE:
             _logger.error("Input data too large for shared memory.")
             return None
 
@@ -483,8 +500,12 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
             return None
 
         # Read result and return it.
-        # TODO(Matthew): Dynamically calculate the size of the returned matrix?
-        return [*struct.unpack_from("195f", self._shared_memory_map, 0)]
+        # TODO(Matthew): Dynamically calculate the size of the returned matrix.
+        return (
+            np.array(struct.unpack_from("195f", self._shared_memory_map, 0))
+            .reshape((15, 13))
+            .astype(np.float32)
+        )
 
     def _validate_rtvc_binary(self) -> bool:
         """
