@@ -438,8 +438,6 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
                 return None
             input_data.append(input_val)
 
-        # TODO(Matthew): Change this to be target matrix as we need to then subset by
-        #                schedule and do inversion after this.
         shape_matrix = self._predict_shape_matrix(input_data)
         if shape_matrix is None:
             _logger.error(
