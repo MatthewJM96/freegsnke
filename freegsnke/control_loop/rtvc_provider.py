@@ -156,6 +156,7 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
     def __init__(
         self,
         model_spec_paths: list[Path],
+        controllable_coils: list[str],
         rtvc_binary: Path | None = None,
         start_rtvc_now: bool = True,
         observable_registry: ObservableRegistry | None = None,
@@ -168,6 +169,8 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         ----------
         model_spec_paths : list[pathlib.Path]
             List of model spec filepaths to use for initialising the RTVC server.
+        controllable_coils : list[str]
+            List of coil names that are used for shape control.
         rtvc_binary : pathlib.Path | None (default: None)
             Path to an RTVC binary, if None then path is taken to be "./rtvc".
         start_rtvc_now : bool (default: True)
@@ -234,6 +237,20 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
                     "that of the first model spec."
                 )
                 return
+
+        # Validate that all controllable coils exist in the inputs of the models.
+        missing_coils = [
+            coil not in self._model_specs[0].inputs for coil in controllable_coils
+        ]
+        if len(missing_coils) != 0:
+            _logger.error(
+                "Some coils specified as controllable are missing from inputs of models"
+                f" in RealTimeVirtualCircuitsProvider: {missing_coils}"
+            )
+            return
+        self._coil_indices = [
+            self._model_specs[0].inputs.index(coil) for coil in controllable_coils
+        ]
 
         # Start RTVC server if requested to start now.
         if start_rtvc_now:
@@ -478,9 +495,9 @@ class RealTimeVirtualCircuitProvider(VirtualCircuitProvider):
         # matrix.
 
         target_indices = [
-            self._model_specs[0].inputs.index(target) for target in targets
+            self._model_specs[0].outputs.index(target) for target in targets
         ]
-        subsetted_shape_matrix = shape_matrix[target_indices, :]
+        subsetted_shape_matrix = shape_matrix[target_indices, :][:, self._coil_indices]
 
         vc_matrix = np.linalg.pinv(subsetted_shape_matrix)
 
